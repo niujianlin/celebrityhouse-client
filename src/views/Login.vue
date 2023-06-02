@@ -60,7 +60,7 @@ const login = async () => {
   if (result.data.code == 200) {
     console.log("result = ", result);
     adminStore.account = result.data.data.user.account;
-    adminStore.userid = result.data.data.user.id;
+    adminStore.userid = result.data.data.user._id;
     adminStore.token = result.data.data.login_token;
 
     //把数据存储到localStorage(若修改了密码，则更新Localstore)
@@ -69,7 +69,13 @@ const login = async () => {
       localStorage.setItem("password", admin.password);
       localStorage.setItem("rember", admin.rember ? 1 : 0);
     }
-    router.push("/dashboard");
+
+    if (result.data.data.user.role === "admin") {
+      router.push("/dashboard");
+    } else {
+      router.push("/home");
+    }
+
     message.info("登录成功");
   } else {
     console.log("result:", result);

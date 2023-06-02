@@ -18,21 +18,33 @@
           size="medium"
           src="https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg"
         />
-        <n-input
+        <textarea
+          v-model="writeComment"
           class="input"
           type="textarea"
           placeholder="自动调整尺寸"
-          :autosize="{
-            minRows: 3,
-          }"
         />
-        <n-upload
+        <label for="file">上传图片</label>
+        <input
+          type="file"
+          id="file1"
+          name="cover"
+          ref="file"
+          @change="onFileChange"
+        />
+        <img
+          class="preuploadpic"
+          src=""
+          ref="preview"
+          style="margin-left: 50px"
+        />
+        <!-- <n-upload
           action="https://www.mocky.io/v2/5e4bafc63100007100d8b70f"
           :default-file-list="fileList"
           list-type="image-card"
         >
           点击上传
-        </n-upload>
+        </n-upload> -->
         <!-- <n-upload
           action="https://www.mocky.io/v2/5e4bafc63100007100d8b70f"
           @before-upload="beforeUpload"
@@ -40,7 +52,7 @@
           <n-button>上传 PNG 文件</n-button>
         </n-upload> -->
 
-        <n-button class="sub" type="info"> 发布 </n-button>
+        <n-button class="sub" type="info" @click="subComment"> 发布 </n-button>
       </div>
       <div class="showcomments">
         <div
@@ -55,6 +67,11 @@
           <span class="content" style="display: block">{{
             comment.content
           }}</span>
+          <img
+            class="picture"
+            :src="comment.imgpath"
+            style="max-height: 500px; display: block"
+          />
           <span class="time" style="display: inline-block">{{
             comment.time
           }}</span>
@@ -94,6 +111,8 @@
 <script setup>
 import { ref, reactive, inject, onMounted, computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
+import { AdminStore } from "../stores/AdminStore";
+const adminStore = AdminStore();
 
 const axios = inject("axios");
 
@@ -110,6 +129,9 @@ let showSonComment = ref([]);
 let tempfather = [];
 let tempson = [];
 let tempfatherhasson = new Set();
+
+//
+const writeComment = ref();
 
 onMounted(() => {
   loadBlog();
@@ -129,6 +151,15 @@ const loadComment = async () => {
   let res = await axios.get("/comment/artical?id=" + route.query.id);
   console.log("评论内容：", res);
   tempfather = res.data.data.filter((item) => item.isparent === 0);
+  tempfather.forEach((item) => {
+    if (
+      item.imgpath !== "" &&
+      item.imgpath !== undefined &&
+      item.imgpath !== null
+    ) {
+      item.imgpath = server_url + item.imgpath;
+    }
+  });
   console.log("tempfather = ", tempfather);
   tempson = res.data.data.filter((item) => item.isparent === 1);
   console.log("sonComment=", sonComment);
@@ -157,6 +188,8 @@ const loadComment = async () => {
 };
 
 // 展开评论
+const server_url = inject("server_url");
+
 let showchild = [];
 const showchildren = (id) => {
   showchild = [];
@@ -180,6 +213,56 @@ const showchildren = (id) => {
   sonComment.value = showchild;
   isshowdetail[id] = !isshowdetail[id];
   console.log("isshowdetail[id] = ", isshowdetail[id]);
+};
+
+// 上传+读取图片
+const preview = ref(null);
+let fileopt;
+const onFileChange = (e) => {
+  let reader = new FileReader();
+  fileopt = e.target.files[0];
+  reader.readAsDataURL(e.target.files[0]);
+  reader.onload = function () {
+    console.log("reader.result = ", reader.result);
+    preview.value.src = reader.result;
+    const formData = new FormData();
+  };
+};
+
+//提交评论
+let url = "";
+const subComment = async () => {
+  if (adminStore.userid == null) {
+    console.log("请登录");
+    alert("请登录");
+    router.push("/login");
+    return;
+  } else {
+    if (fileopt != null) {
+      console.log("评论有图片");
+      const formData = new FormData();
+      formData.append("image", fileopt);
+
+      const res = await axios.post("/upload/comment_pic_upload", formData);
+
+      console.log("图片res(url) = ", res.data.data.url);
+      url = res.data.data.url;
+    }
+
+    console.log("adminStore.userid = ", adminStore.userid);
+    console.log("adminStore = ", adminStore);
+
+    const response = await axios.post("/comment/add", {
+      aid: route.query.id,
+      uid: adminStore.userid,
+      content: writeComment.value,
+      isparent: 0,
+      parentid: "",
+      imgpath: url,
+    });
+
+    console.log("添加评论的response = ", response);
+  }
 };
 
 const back = () => {
@@ -234,5 +317,9 @@ const back = () => {
 }
 .comments-item .time {
   font-size: small;
+}
+
+.preuploadpic {
+  height: 60px;
 }
 </style>
